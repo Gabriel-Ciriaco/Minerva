@@ -1,0 +1,98 @@
+"""Leitura do minerva.yaml (opcional) com padrões e validação."""
+import hashlib
+import json
+from dataclasses import dataclass, field
+from pathlib import Path, PurePosixPath
+
+import yaml
+
+CONFIG_NAME = "minerva.yaml"
+DOC_TYPES = {"material", "livro"}
+KEYS = {"disciplina", "tipos", "ignorar"}
+
+TEMPLATE = """\
+# Configuração do Minerva. Tudo é opcional; apague o que não usar.
+
+# Nome da disciplina (aparece nas respostas do outline).
+# disciplina: Cálculo I
+
+# Tipo de cada fonte: "material" (slides, resumos; prioridade na busca) ou "livro".
+# Padrão: documentos com 200 páginas ou mais são livros. Precedência: arquivo >
+# pasta mais específica > padrão. Caminhos relativos a esta pasta; pasta termina em "/".
+# tipos:
+#   livros/: livro
+#   "slides/apostila_longa.pdf": material
+
+# Arquivos ou pastas fora do índice.
+# ignorar: [rascunhos/]
+"""
+
+
+class ConfigError(ValueError):
+    pass
+
+
+@dataclass
+class Config:
+    disciplina: str = ""
+    tipos: dict = field(default_factory=dict)
+    ignorar: list = field(default_factory=list)
+
+    def signature(self):
+        """Muda quando a configuração muda o conteúdo do índice."""
+        data = json.dumps({"tipos": self.tipos, "ignorar": self.ignorar}, sort_keys=True)
+        return hashlib.sha256(data.encode()).hexdigest()[:12]
+
+    def doc_type(self, rel):
+        """Tipo configurado para o caminho relativo `rel` (posix), ou None para a heurística."""
+        if rel in self.tipos:
+            return self.tipos[rel]
+        best = None
+        for key, value in self.tipos.items():
+            if key.endswith("/") and rel.startswith(key) and (best is None or len(key) > len(best[0])):
+                best = (key, value)
+        return best[1] if best else None
+
+    def ignored(self, rel):
+        return any(rel == p or (p.endswith("/") and rel.startswith(p)) for p in self.ignorar)
+
+
+def _norm(path, what):
+    if not isinstance(path, str) or not path.strip():
+        raise ConfigError(f"{what}: caminho inválido {path!r}")
+    p = path.strip().replace("\\", "/")
+    folder = p.endswith("/")
+    pure = PurePosixPath(p)
+    if pure.is_absolute() or ".." in pure.parts:
+        raise ConfigError(f"{what}: use caminho relativo dentro do workspace ({path!r})")
+    return str(pure) + ("/" if folder else "")
+
+
+def load(workspace):
+    path = Path(workspace) / CONFIG_NAME
+    if not path.exists():
+        return Config()
+    try:
+        data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    except yaml.YAMLError as exc:
+        raise ConfigError(f"{CONFIG_NAME} inválido: {exc}") from exc
+    if not isinstance(data, dict):
+        raise ConfigError(f"{CONFIG_NAME} deve ser um mapa de chaves")
+    unknown = set(data) - KEYS
+    if unknown:
+        raise ConfigError(f"{CONFIG_NAME}: chave desconhecida {sorted(unknown)}; válidas: {sorted(KEYS)}")
+    disciplina = data.get("disciplina") or ""
+    if not isinstance(disciplina, str):
+        raise ConfigError("disciplina deve ser texto")
+    tipos = data.get("tipos") or {}
+    if not isinstance(tipos, dict):
+        raise ConfigError("tipos deve ser um mapa caminho: tipo")
+    norm_tipos = {}
+    for key, value in tipos.items():
+        if value not in DOC_TYPES:
+            raise ConfigError(f"tipos: {key!r} tem tipo {value!r}; use {sorted(DOC_TYPES)}")
+        norm_tipos[_norm(key, "tipos")] = value
+    ignorar = data.get("ignorar") or []
+    if not isinstance(ignorar, list):
+        raise ConfigError("ignorar deve ser uma lista")
+    return Config(disciplina, norm_tipos, [_norm(p, "ignorar") for p in ignorar])
