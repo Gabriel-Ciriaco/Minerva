@@ -1,0 +1,34 @@
+%PDF-1.4
+1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj
+2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj
+3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >> endobj
+4 0 obj << /Length 913 >> stream
+BT
+/F1 12 Tf
+50 750 Td
+16 TL
+(DOCUMENTO DE ESPECIFICACAO DE REQUISITOS - SISTEMA MINERVA) '
+(Versao 1.0 - Modulo de Indexacao e Recuperacao) '
+() '
+(Requisitos Funcionais:) '
+([RF01] O sistema deve converter arquivos PDF, PPTX e Markdown em trechos indexados.) '
+([RF02] O agente deve responder com citacao explicita de pagina fisica ou numero de slide.) '
+([RF03] O sistema deve rejeitar caminhos externos fora da pasta sources atravessando symlinks.) '
+() '
+(Metricas de Qualidade e Desempenho \\\(Requisitos Nao-Funcionais\\\):) '
+(Metrica               Alvo Aceitavel       Tempo Limite) '
+(Latencia de busca     < 100 ms             250 ms) '
+(Teto de tokens        600 tokens           800 tokens maximo) '
+(Consumo de memoria    < 150 MB             300 MB) '
+(Recall no top-5       >= 80%               >= 70%) '
+() '
+(Formula de calculo de precisao: P = Relevantes_Recuperados / Total_Recuperados.) '
+ET
+
+endstream
+endobj
+5 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >> endobj
+trailer << /Size 6 /Root 1 0 R >>
+startxref
+1302
+%%EOF

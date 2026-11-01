@@ -1,0 +1,10 @@
+# Workspaces criados pelo Minerva: índice, logs e configuração do agente
+.minerva/
+memory.md
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/

@@ -1,0 +1,50 @@
+%PDF-1.4
+1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj
+2 0 obj << /Type /Pages /Kids [3 0 R 6 0 R] /Count 2 >> endobj
+3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >> endobj
+4 0 obj << /Length 743 >> stream
+BT
+/F1 12 Tf
+50 750 Td
+16 TL
+(UNIVERSIDADE EXEMPLO - DEPARTAMENTO DE COMPUTACAO) '
+(Curso: Ciencia da Computacao) '
+(Disciplina: Engenharia de Software I) '
+(Codigo: ES1-2026) '
+() '
+(EMENTA OFICIAL DA DISCIPLINA:) '
+(1. Introducao aos Processos de Software: modelo Cascata, Prototipacao e Desenvolvimento Agil.) '
+(2. Engenharia de Requisitos: elicitacao, analise, especificacao e validacao de requisitos funcionais.) '
+(3. Requisitos Nao-Funcionais \\\(RNF\\\): desempenho, seguranca, usabilidade e confiabilidade.) '
+(4. Casos de Uso e Historias de Usuario \\\(User Stories\\\).) '
+(5. Modelagem conceitual utilizando Unified Modeling Language \\\(UML\\\).) '
+(Bibliografia Principal: Sommerville, Engenharia de Software, 10a Edicao.) '
+ET
+
+endstream
+endobj
+5 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >> endobj
+6 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents 7 0 R /Resources << /Font << /F1 8 0 R >> >> >> endobj
+7 0 obj << /Length 530 >> stream
+BT
+/F1 12 Tf
+50 750 Td
+16 TL
+(Engenharia de Software I - Pagina 2) '
+() '
+(CRITERIOS DE AVALIACAO E PROVAS:) '
+(- Prova P1 \\\(Peso 4.0\\\): Processos de Software e Engenharia de Requisitos.) '
+(- Prova P2 \\\(Peso 4.0\\\): Modelagem UML, Casos de Uso e Arquitetura de Software.) '
+(- Projeto Pratico \\\(Peso 2.0\\\): Especificacao completa de um sistema real em equipe.) '
+() '
+(Horario de Atendimento: Quartas-feiras das 14h as 16h no Bloco de Computacao.) '
+(Monitoria: Tercas e Quintas das 17h as 18h no Laboratorio 3.) '
+ET
+
+endstream
+endobj
+8 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >> endobj
+trailer << /Size 9 /Root 1 0 R >>
+startxref
+1942
+%%EOF
