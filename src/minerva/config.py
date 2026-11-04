@@ -8,7 +8,8 @@ import yaml
 
 CONFIG_NAME = "minerva.yaml"
 DOC_TYPES = {"material", "livro"}
-KEYS = {"disciplina", "fontes", "tipos", "ignorar"}
+KEYS = {"disciplina", "fontes", "tipos", "ignorar", "ollama"}
+OLLAMA_KEYS = {"modelo", "host", "contexto"}
 
 TEMPLATE = """\
 # Configuração do Minerva. Tudo é opcional; apague o que não usar.
@@ -29,6 +30,11 @@ TEMPLATE = """\
 
 # Arquivos ou pastas fora do índice.
 # ignorar: [rascunhos/]
+
+# Modelo local para `minerva chat` (Ollama). Precisa suportar ferramentas (ex.: qwen3).
+# host padrão: OLLAMA_HOST ou http://localhost:11434; contexto padrão: 8192 tokens.
+# ollama:
+#   modelo: qwen3:8b
 """
 
 
@@ -42,6 +48,7 @@ class Config:
     tipos: dict = field(default_factory=dict)
     ignorar: list = field(default_factory=list)
     fontes: list = field(default_factory=list)
+    ollama: dict = field(default_factory=dict)  # só o `minerva chat` usa; fora da assinatura
 
     def signature(self):
         """Muda quando a configuração muda o conteúdo do índice."""
@@ -118,4 +125,17 @@ def load(workspace):
             raise ConfigError(f"fontes: {p!r} termina em '/' mas é um arquivo")
         if rel not in norm_fontes:
             norm_fontes.append(rel)
-    return Config(disciplina, norm_tipos, [_norm(p, "ignorar") for p in ignorar], sorted(norm_fontes))
+    ollama = data.get("ollama") or {}
+    if not isinstance(ollama, dict):
+        raise ConfigError("ollama deve ser um mapa (modelo, host, contexto)")
+    if set(ollama) - OLLAMA_KEYS:
+        raise ConfigError(f"ollama: chave desconhecida {sorted(set(ollama) - OLLAMA_KEYS)}; "
+                          f"válidas: {sorted(OLLAMA_KEYS)}")
+    for key in ("modelo", "host"):
+        if key in ollama and not (isinstance(ollama[key], str) and ollama[key].strip()):
+            raise ConfigError(f"ollama.{key} deve ser texto")
+    ctx = ollama.get("contexto")
+    if ctx is not None and (not isinstance(ctx, int) or isinstance(ctx, bool) or ctx < 2048):
+        raise ConfigError("ollama.contexto deve ser um número inteiro de tokens (mínimo 2048)")
+    return Config(disciplina, norm_tipos, [_norm(p, "ignorar") for p in ignorar], sorted(norm_fontes),
+                  dict(ollama))

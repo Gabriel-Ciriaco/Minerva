@@ -1,10 +1,34 @@
-"""Sobe `python -m minerva serve` via stdio, como o Antigravity faz, e chama as ferramentas."""
+"""Sobe `python -m minerva serve` via stdio, como os clientes fazem, e chama as ferramentas."""
 import asyncio
 import json
 import sys
+import tomllib
 
+import pytest
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
+
+from minerva import connect
+
+
+@pytest.mark.parametrize("client", ["antigravity", "claude-code", "codex"])
+def test_entry_written_by_connect_starts_the_server(workspace, tmp_path, client):
+    """O comando gravado na configuração de cada cliente sobe o servidor de verdade."""
+    connect.connect(client, workspace)
+    path = workspace / connect.CLIENTS[client].config
+    text = path.read_text(encoding="utf-8")
+    servers = tomllib.loads(text)["mcp_servers"] if path.suffix == ".toml" else json.loads(text)["mcpServers"]
+    entry = servers["minerva"]
+
+    async def run():
+        params = StdioServerParameters(command=entry["command"], args=entry["args"], cwd=str(tmp_path))
+        async with stdio_client(params) as (r, w), ClientSession(r, w) as s:
+            await s.initialize()
+            assert {t.name for t in (await s.list_tools()).tools} == {"search", "outline", "read"}
+            got = json.loads((await s.call_tool("search", {"query": "singleton"})).content[0].text)
+            assert got["r"]
+
+    asyncio.run(run())
 
 
 def test_stdio_server_end_to_end(workspace, tmp_path):

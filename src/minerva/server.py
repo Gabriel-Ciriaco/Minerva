@@ -18,7 +18,9 @@ from minerva import __version__, index
 from minerva import search as engine
 
 
-def build(workspace, log=False):
+def build(workspace, log=False, budget=None):
+    """Servidor com as três ferramentas. O `minerva chat` usa o mesmo objeto no processo,
+    passando o próprio `budget` para marcar o início de cada pergunta."""
     workspace = Path(workspace).resolve()
     log_path = None
     if log:
@@ -49,7 +51,7 @@ def build(workspace, log=False):
                                     "secs": round(time.perf_counter() - t0, 3)}, ensure_ascii=False) + "\n")
         return payload
 
-    budget = engine.QuestionBudget()
+    budget = budget or engine.QuestionBudget()
     mcp = MCPServer("minerva")
 
     @mcp.tool()
