@@ -12,9 +12,9 @@ def test_connect_is_idempotent_and_preserves_others(tmp_path):
     (agents / "AGENTS.md").write_text("# Minhas regras\nnão mexa\n", encoding="utf-8")
 
     first = connect.connect_antigravity(tmp_path)
-    assert [s for s, _ in first] == ["escrito", "escrito"]
+    assert [s for s, _ in first] == ["escrito", "escrito", "escrito"]
     second = connect.connect_antigravity(tmp_path)
-    assert [s for s, _ in second] == ["igual", "igual"]
+    assert [s for s, _ in second] == ["igual", "igual", "igual"]
 
     data = json.loads((agents / "mcp_config.json").read_text())
     assert data["mcpServers"]["outro"] == {"command": "x"}
@@ -51,6 +51,21 @@ def test_connect_updates_only_minerva_block(tmp_path):
     assert connect.connect_antigravity(tmp_path)[1][0] == "escrito"
     text = path.read_text(encoding="utf-8")
     assert text.startswith("antes\n") and text.endswith("depois\n") and "Velho" not in text
+
+
+def test_memory_is_created_once_and_never_overwritten(tmp_path):
+    assert connect.ensure_memory(tmp_path)[0] == "escrito"
+    mem = tmp_path / "MEMORIA.md"
+    assert "## Andamento" in mem.read_text(encoding="utf-8")
+    mem.write_text("minha memória\n", encoding="utf-8")
+    assert connect.ensure_memory(tmp_path)[0] == "igual"
+    assert mem.read_text(encoding="utf-8") == "minha memória\n"
+
+
+def test_rules_mention_memory(tmp_path):
+    connect.connect_antigravity(tmp_path)
+    rules = (tmp_path / ".agents" / "AGENTS.md").read_text(encoding="utf-8")
+    assert "MEMORIA.md" in rules and "disser sim" in rules
 
 
 def test_config_precedence(tmp_path):

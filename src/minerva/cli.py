@@ -43,6 +43,8 @@ def cmd_init(args):
     else:
         cfg.write_text(config_mod.TEMPLATE, encoding="utf-8")
         print(f"criado: {cfg}")
+    state, _ = connect_mod.ensure_memory(ws)
+    print(f"{'criado' if state == 'escrito' else 'mantido'}: {ws / connect_mod.MEMORY_NAME}")
     gi = ws / ".gitignore"
     if not gi.exists() and not (ws / ".git").exists():
         gi.write_text(GITIGNORE_NEW, encoding="utf-8")
@@ -185,6 +187,15 @@ def cmd_doctor(args):
             report("AVISO" if leaked else "OK",
                    f"{len(leaked)} fonte(s) ou arquivo(s) do índice versionados no git: {', '.join(leaked[:5])}"
                    if leaked else "nenhuma fonte versionada no git")
+
+    mem = ws / connect_mod.MEMORY_NAME
+    if mem.exists():
+        size = mem.stat().st_size
+        report("AVISO" if size > 2048 else "OK",
+               f"{connect_mod.MEMORY_NAME}: {size / 1024:.1f} KB"
+               + ("; peça ao agente para consolidar (vai em toda conversa)" if size > 2048 else ""))
+    else:
+        report("AVISO", f"{connect_mod.MEMORY_NAME} ausente; `minerva init` ou `connect` cria")
 
     cfg_path = ws / connect_mod.AGENTS_DIR / "mcp_config.json"
     if not cfg_path.exists():

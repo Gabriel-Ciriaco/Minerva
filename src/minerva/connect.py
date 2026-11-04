@@ -12,6 +12,7 @@ from pathlib import Path
 from minerva import config as config_mod
 
 AGENTS_DIR = ".agents"
+MEMORY_NAME = "MEMORIA.md"
 BEGIN, END = "<!-- minerva:inicio -->", "<!-- minerva:fim -->"
 
 
@@ -72,9 +73,20 @@ def _write_rules(path, workspace):
     return "escrito", f"{path}: bloco do Minerva atualizado; o resto não foi alterado"
 
 
+def ensure_memory(workspace):
+    """Cria o MEMORIA.md na raiz do workspace se não existir; nunca altera um existente."""
+    path = Path(workspace).resolve() / MEMORY_NAME
+    if path.exists():
+        return "igual", f"{path}: mantido"
+    path.write_text(files("minerva").joinpath("templates/MEMORIA.md").read_text(encoding="utf-8"),
+                    encoding="utf-8")
+    return "escrito", f"{path}: criado"
+
+
 def connect_antigravity(workspace, force=False, log=False):
     """Retorna [(estado, mensagem)]; estado ∈ escrito, igual, conflito, erro."""
     folder = Path(workspace).resolve() / AGENTS_DIR
     folder.mkdir(exist_ok=True)
     return [_write_config(folder / "mcp_config.json", workspace, force, log),
-            _write_rules(folder / "AGENTS.md", workspace)]
+            _write_rules(folder / "AGENTS.md", workspace),
+            ensure_memory(workspace)]

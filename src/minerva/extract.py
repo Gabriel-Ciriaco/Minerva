@@ -26,7 +26,8 @@ logging.getLogger("pypdf").addHandler(
 IMAGE_EXT = {".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tif", ".tiff", ".webp"}
 
 # Arquivos do agente/cliente que podem estar na pasta do workspace, mas não são fontes.
-EXCLUDED_NAMES = {"agents.md", "gemini.md", "claude.md", "mcp_config.json", "memory.md", "minerva.yaml"}
+EXCLUDED_NAMES = {"agents.md", "gemini.md", "claude.md", "mcp_config.json", "memory.md", "memoria.md",
+                  "minerva.yaml"}
 
 
 def is_candidate(rel_parts, name):

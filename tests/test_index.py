@@ -182,6 +182,7 @@ def test_agent_files_and_hidden_dirs_are_not_sources(workspace):
     (workspace / ".agents" / "notas.md").write_text("## x\nsegredo\n", encoding="utf-8")
     (workspace / "AGENTS.md").write_text("## x\nsegredo\n", encoding="utf-8")
     (workspace / "memory.md").write_text("## x\nsegredo\n", encoding="utf-8")
+    (workspace / "MEMORIA.md").write_text("## x\nsegredo\n", encoding="utf-8")
     index.ingest(workspace)
     con = index.connect_ro(workspace)
     assert not loads(engine.search(con, "segredo")[0])["r"]
