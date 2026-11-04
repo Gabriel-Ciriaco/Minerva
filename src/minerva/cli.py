@@ -65,8 +65,11 @@ def cmd_ingest(args):
         rows = index.ingest(ws, rebuild=args.rebuild)
     except (index.IndexUnavailable, config_mod.ConfigError, OSError) as exc:
         sys.exit(f"erro: {exc}")
-    counts = {}
+    counts, unsupported = {}, []
     for r in rows:
+        if r.get("motivo") == "formato não suportado":
+            unsupported.append(r["file"])
+            continue
         counts[r["acao"]] = counts.get(r["acao"], 0) + 1
         if r["acao"] == "igual" and not args.verbose:
             continue
@@ -81,8 +84,23 @@ def cmd_ingest(args):
     con.close()
     print(f"{n_src} fontes, {n_chunks} trechos; " + ", ".join(f"{k}: {v}" for k, v in sorted(counts.items()))
           + f"; {time.perf_counter() - t0:.1f} s")
+    if unsupported:
+        print(_unsupported_summary(unsupported))
     if issues:
         print(f"{issues} fonte(s) com status diferente de ok; veja `minerva outline` ou `minerva doctor`")
+
+
+def _unsupported_summary(paths):
+    """Uma linha: `41 arquivo(s) fora do índice por formato (.py ×18, .pyc ×9, ...)`."""
+    by_ext = {}
+    for p in paths:
+        name = p.rsplit("/", 1)[-1]
+        ext = "." + name.rsplit(".", 1)[-1].lower() if "." in name else "(sem extensão)"
+        by_ext[ext] = by_ext.get(ext, 0) + 1
+    top = sorted(by_ext.items(), key=lambda kv: (-kv[1], kv[0]))
+    shown = ", ".join(f"{e} ×{n}" for e, n in top[:6]) + (", ..." if len(top) > 6 else "")
+    return (f"{len(paths)} arquivo(s) fora do índice por formato ({shown}); "
+            "use `fontes:` no minerva.yaml para ler só os materiais")
 
 
 def _with_con(args, fn):
@@ -126,11 +144,20 @@ def cmd_doctor(args):
         report("OK", f"SQLite {sqlite3.sqlite_version} com FTS5")
     except sqlite3.OperationalError:
         report("ERRO", "SQLite sem FTS5")
+    cfg = None
     try:
-        config_mod.load(ws)
-        report("OK", "minerva.yaml válido ou ausente (padrões)")
+        cfg = config_mod.load(ws)
+        report("OK", "minerva.yaml válido ou ausente (padrões)"
+               + (f"; fontes: {', '.join(cfg.fontes)}" if cfg.fontes else "; lendo o workspace inteiro"))
     except config_mod.ConfigError as exc:
         report("ERRO", str(exc))
+    if cfg is not None:
+        try:
+            unsupported = index.scan(ws, cfg)[2]
+        except OSError:
+            unsupported = []
+        if unsupported:
+            report("AVISO", _unsupported_summary(unsupported))
 
     try:
         con = index.connect_ro(ws)
@@ -141,9 +168,14 @@ def cmd_doctor(args):
         pending = index.pending_changes(con, ws)
         report("AVISO" if pending else "OK",
                f"{len(pending)} arquivo(s) mudaram desde o último ingest" if pending else "índice em dia")
+        no_text = False
         for path, status, stale in con.execute(
                 "SELECT path, status, stale FROM sources WHERE status != 'ok' OR stale = 1 ORDER BY path"):
             report("AVISO", f"{path}: {'desatualizado (reextração falhou)' if stale else status}")
+            no_text |= status in ("sem_texto", "imagem_sem_ocr")
+        if no_text:
+            report("DICA", "sem_texto/imagem_sem_ocr: a busca não alcança esses arquivos; procure uma versão "
+                           "digital ou aplique OCR antes (veja \"PDFs escaneados\" no README)")
         sources = [p for (p,) in con.execute("SELECT path FROM sources")]
         con.close()
         tracked = _git_tracked(ws)

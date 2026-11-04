@@ -183,6 +183,12 @@ def extract_md(path, name):
 EXTRACTORS = {".pdf": extract_pdf, ".pptx": extract_pptx, ".md": extract_md}
 
 
+def is_supported(name):
+    """Formato que vira fonte. Imagens entram (status `imagem_sem_ocr`) para o aluno saber delas."""
+    ext = "." + name.rsplit(".", 1)[-1].lower() if "." in name else ""
+    return ext in EXTRACTORS or ext in IMAGE_EXT
+
+
 def _status(units):
     errors = sum(1 for u in units if u["error"])
     empty = sum(1 for u in units if not u["content"] and not u["error"])

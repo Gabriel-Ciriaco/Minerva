@@ -97,6 +97,7 @@ Os testes usam um corpus sintético em `tests/corpus/` (gerado por `tests/genera
 
 ```yaml
 disciplina: Cálculo I          # aparece no título das regras do agente
+fontes: [materiais/]            # só isto entra no índice; sem a chave, o workspace inteiro
 tipos:                          # "material" tem prioridade na busca; "livro" vira "ver também"
   livros/: livro
   "slides/apostila_longa.pdf": material
@@ -104,6 +105,12 @@ ignorar: [rascunhos/]
 ```
 
 Sem configuração, documentos com 200 páginas ou mais são tratados como livros. Ficam fora do índice pastas ocultas (`.git`, `.agents`, `.minerva`) e arquivos de agente (`AGENTS.md`, `memory.md`...).
+
+Use `fontes` quando o workspace tiver mais coisas além dos materiais (exercícios resolvidos, código, anotações): assim só os materiais entram na busca. O `ignorar` continua valendo dentro das fontes. Formatos lidos: PDF, PPTX e Markdown; os demais arquivos aparecem resumidos numa linha do `ingest`.
+
+#### PDFs escaneados
+
+PDFs sem camada de texto (status `sem_texto`) e imagens (`imagem_sem_ocr`) aparecem no `outline`, mas a busca não os alcança. Antes de indexar, procure uma versão digital do material ou aplique OCR uma vez, fora do Minerva, por exemplo com o [OCRmyPDF](https://ocrmypdf.readthedocs.io/) (`ocrmypdf -l por arquivo.pdf arquivo.pdf`). O OCR costuma errar fórmulas e símbolos; confira os trechos citados.
 
 ---
 

@@ -138,6 +138,27 @@ def test_removing_fontes_brings_workspace_back(workspace):
     assert acts["exercicios/lista.md"] == "novo" and acts["doc4_resumo_codigo.md"] == "novo"
 
 
+def test_unsupported_files_are_not_sources(workspace):
+    (workspace / "script.py").write_text("print(1)\n", encoding="utf-8")
+    (workspace / "LICENSE").write_text("MIT\n", encoding="utf-8")
+    (workspace / "foto.jpg").write_bytes(b"\xff\xd8")
+    rows = index.ingest(workspace)
+    motivos = {r["file"]: r.get("motivo") for r in rows}
+    assert motivos["script.py"] == motivos["LICENSE"] == "formato não suportado"
+    assert _actions(rows)["foto.jpg"] == "novo"  # imagem continua listada (imagem_sem_ocr)
+    con = index.connect_ro(workspace)
+    paths = {p for (p,) in con.execute("SELECT path FROM sources")}
+    assert "script.py" not in paths and "foto.jpg" in paths
+    assert index.pending_changes(con, workspace) == []
+    con.close()
+
+
+def test_unsupported_summary_is_one_line():
+    from minerva.cli import _unsupported_summary
+    line = _unsupported_summary(["a.py", "b/c.py", "LICENSE", "x.css"])
+    assert line.startswith("4 arquivo(s)") and ".py ×2" in line and "\n" not in line
+
+
 def test_schema_mismatch_requires_rebuild(workspace):
     import sqlite3
     db = sqlite3.connect(index.db_path(workspace))

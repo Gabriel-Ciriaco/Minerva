@@ -15,7 +15,8 @@ from contextlib import contextmanager
 from pathlib import Path
 
 from minerva import config as config_mod
-from minerva.extract import TOKENIZER, extract_file, infer_doc_type, is_candidate, pipeline_config
+from minerva.extract import (TOKENIZER, extract_file, infer_doc_type, is_candidate, is_supported,
+                             pipeline_config)
 
 SCHEMA_VERSION = "1"
 STATE_DIR = ".minerva"
@@ -172,13 +173,13 @@ def ingest_lock(workspace):
 # ---------------------------------------------------------------------------
 
 def scan(workspace, cfg):
-    """Fontes do workspace: {caminho relativo posix: Path}.
+    """Fontes do workspace: ({caminho relativo posix: Path}, fora do workspace, formato não suportado).
 
     Lança OSError se alguma pasta não puder ser lida: uma varredura incompleta nunca pode
     ser tratada como exclusão dos arquivos que ela não viu.
     """
     root = Path(workspace).resolve()
-    found, skipped = {}, []
+    found, skipped, unsupported = {}, [], []
 
     def fail(exc):
         raise exc
@@ -186,6 +187,9 @@ def scan(workspace, cfg):
     def consider(rel_parts, path):
         rel = "/".join(rel_parts)
         if not is_candidate(rel_parts, rel_parts[-1]) or cfg.ignored(rel):
+            return
+        if not is_supported(rel_parts[-1]):
+            unsupported.append(rel)
             return
         if not path.resolve().is_relative_to(root):  # symlink/junction para fora do workspace
             skipped.append(rel)
@@ -206,7 +210,7 @@ def scan(workspace, cfg):
             dirnames[:] = sorted(d for d in dirnames if not d.startswith("."))
             for name in sorted(filenames):
                 consider(rel_dir + (name,), Path(dirpath) / name)
-    return found, skipped
+    return found, skipped, unsupported
 
 
 def _sha256(path):
@@ -260,9 +264,10 @@ def _ingest(con, workspace, cfg, progress):
     # antes. A assinatura nova só é gravada no fim; uma ingestão interrompida recomeça assim.
     force = bool(old_sig) and old_sig[0] != signature
 
-    files, skipped = scan(workspace, cfg)  # OSError aborta antes de qualquer remoção
+    files, skipped, unsupported = scan(workspace, cfg)  # OSError aborta antes de qualquer remoção
     known = {r[0]: r for r in con.execute("SELECT path, sha256, stale FROM sources")}
     out = [{"file": rel, "acao": "ignorado", "motivo": "fora do workspace"} for rel in skipped]
+    out += [{"file": rel, "acao": "ignorado", "motivo": "formato não suportado"} for rel in unsupported]
 
     for rel, path in files.items():
         progress(rel)
@@ -332,7 +337,7 @@ def pending_changes(con, workspace):
     """
     try:
         cfg = config_mod.load(workspace)
-        files, _ = scan(workspace, cfg)
+        files = scan(workspace, cfg)[0]
     except (OSError, config_mod.ConfigError):
         return ["(não foi possível verificar a pasta)"]
     known = {r[0]: (r[1], r[2]) for r in con.execute("SELECT path, mtime, size FROM sources")}
