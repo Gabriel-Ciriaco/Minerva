@@ -183,22 +183,29 @@ def scan(workspace, cfg):
     def fail(exc):
         raise exc
 
-    for dirpath, dirnames, filenames in os.walk(root, onerror=fail):
-        rel_dir = Path(dirpath).relative_to(root).parts
-        dirnames[:] = sorted(d for d in dirnames if not d.startswith("."))
-        for name in sorted(filenames):
-            rel_parts = rel_dir + (name,)
-            if not is_candidate(rel_parts, name):
-                continue
-            rel = "/".join(rel_parts)
-            if cfg.ignored(rel):
-                continue
-            path = Path(dirpath) / name
-            resolved = path.resolve()
-            if not resolved.is_relative_to(root):  # symlink/junction para fora do workspace
-                skipped.append(rel)
-                continue
-            found[rel] = path
+    def consider(rel_parts, path):
+        rel = "/".join(rel_parts)
+        if not is_candidate(rel_parts, rel_parts[-1]) or cfg.ignored(rel):
+            return
+        if not path.resolve().is_relative_to(root):  # symlink/junction para fora do workspace
+            skipped.append(rel)
+            return
+        found[rel] = path
+
+    # Sem `fontes`, o workspace inteiro; com `fontes`, só as pastas e arquivos listados.
+    for start in cfg.fontes or [""]:
+        start_path = root / start.rstrip("/") if start else root
+        if not start.endswith("/") and start:
+            consider(tuple(start.split("/")), start_path)
+            continue
+        if not start_path.resolve().is_relative_to(root):
+            skipped.append(start)
+            continue
+        for dirpath, dirnames, filenames in os.walk(start_path, onerror=fail):
+            rel_dir = Path(dirpath).relative_to(root).parts
+            dirnames[:] = sorted(d for d in dirnames if not d.startswith("."))
+            for name in sorted(filenames):
+                consider(rel_dir + (name,), Path(dirpath) / name)
     return found, skipped
 
 

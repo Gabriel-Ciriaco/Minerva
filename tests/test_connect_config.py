@@ -63,6 +63,13 @@ def test_config_precedence(tmp_path):
     assert cfg.doc_type("slides/a.pdf") is None
 
 
+def test_fontes_normalized(tmp_path):
+    (tmp_path / "materiais").mkdir()
+    (tmp_path / "a.md").write_text("x", encoding="utf-8")
+    (tmp_path / "minerva.yaml").write_text("fontes: ['materiais', 'materiais/', 'a.md']\n", encoding="utf-8")
+    assert config.load(tmp_path).fontes == ["a.md", "materiais/"]
+
+
 @pytest.mark.parametrize("text", [
     "tipo: {a: livro}\n",            # chave desconhecida
     "tipos: {a.pdf: apostila}\n",    # tipo inválido
@@ -70,8 +77,14 @@ def test_config_precedence(tmp_path):
     "ignorar: rascunhos/\n",         # não é lista
     "- lista\n",                     # não é mapa
     "tipos: [\n",                    # YAML quebrado
+    "fontes: materiais/\n",          # não é lista
+    "fontes: [nao_existe/]\n",       # inexistente
+    "fontes: [../fora/]\n",          # fora do workspace
+    "fontes: [.]\n",                 # workspace inteiro: basta apagar a chave
+    "fontes: [a.md/]\n",             # arquivo com barra de pasta
 ])
 def test_invalid_config_is_explicit_error(tmp_path, text):
+    (tmp_path / "a.md").write_text("x", encoding="utf-8")
     (tmp_path / "minerva.yaml").write_text(text, encoding="utf-8")
     with pytest.raises(config.ConfigError):
         config.load(tmp_path)

@@ -106,6 +106,38 @@ def test_config_change_triggers_full_reindex(workspace):
     assert acts["doc1_ementa.pdf"] == "alterado"
 
 
+def _fontes_layout(workspace):
+    (workspace / "materiais" / "sub").mkdir(parents=True)
+    (workspace / "materiais" / "aula.md").write_text("## A\ncapivara\n", encoding="utf-8")
+    (workspace / "materiais" / "sub" / "rascunho.md").write_text("## R\ntamandua\n", encoding="utf-8")
+    (workspace / "exercicios").mkdir()
+    (workspace / "exercicios" / "lista.md").write_text("## L\nsolucao minha\n", encoding="utf-8")
+
+
+def test_fontes_limits_scan_to_listed_paths(workspace):
+    _fontes_layout(workspace)
+    (workspace / "minerva.yaml").write_text(
+        "fontes: [materiais, doc1_ementa.pdf]\nignorar: [materiais/sub/]\n", encoding="utf-8")
+    acts = _actions(index.ingest(workspace))
+    assert acts["materiais/aula.md"] == "novo"
+    assert acts["doc1_ementa.pdf"] == "alterado"           # assinatura mudou: reextraído
+    assert acts["doc4_resumo_codigo.md"] == "removido"     # fora das fontes
+    assert "exercicios/lista.md" not in acts               # nunca entrou
+    assert "materiais/sub/rascunho.md" not in acts         # ignorar vale dentro das fontes
+    con = index.connect_ro(workspace)
+    assert index.pending_changes(con, workspace) == []
+    con.close()
+
+
+def test_removing_fontes_brings_workspace_back(workspace):
+    _fontes_layout(workspace)
+    (workspace / "minerva.yaml").write_text("fontes: [materiais/]\n", encoding="utf-8")
+    index.ingest(workspace)
+    (workspace / "minerva.yaml").write_text("", encoding="utf-8")
+    acts = _actions(index.ingest(workspace))
+    assert acts["exercicios/lista.md"] == "novo" and acts["doc4_resumo_codigo.md"] == "novo"
+
+
 def test_schema_mismatch_requires_rebuild(workspace):
     import sqlite3
     db = sqlite3.connect(index.db_path(workspace))

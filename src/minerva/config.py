@@ -8,13 +8,17 @@ import yaml
 
 CONFIG_NAME = "minerva.yaml"
 DOC_TYPES = {"material", "livro"}
-KEYS = {"disciplina", "tipos", "ignorar"}
+KEYS = {"disciplina", "fontes", "tipos", "ignorar"}
 
 TEMPLATE = """\
 # Configuração do Minerva. Tudo é opcional; apague o que não usar.
 
 # Nome da disciplina (aparece nas respostas do outline).
 # disciplina: Cálculo I
+
+# Pastas ou arquivos que entram no índice. Sem esta chave, todo o workspace é lido.
+# Recomendado: aponte só para os materiais (exercícios e anotações suas ficam de fora).
+# fontes: [materiais/]
 
 # Tipo de cada fonte: "material" (slides, resumos; prioridade na busca) ou "livro".
 # Padrão: documentos com 200 páginas ou mais são livros. Precedência: arquivo >
@@ -37,10 +41,12 @@ class Config:
     disciplina: str = ""
     tipos: dict = field(default_factory=dict)
     ignorar: list = field(default_factory=list)
+    fontes: list = field(default_factory=list)
 
     def signature(self):
         """Muda quando a configuração muda o conteúdo do índice."""
-        data = json.dumps({"tipos": self.tipos, "ignorar": self.ignorar}, sort_keys=True)
+        data = json.dumps({"tipos": self.tipos, "ignorar": self.ignorar, "fontes": self.fontes},
+                          sort_keys=True)
         return hashlib.sha256(data.encode()).hexdigest()[:12]
 
     def doc_type(self, rel):
@@ -95,4 +101,21 @@ def load(workspace):
     ignorar = data.get("ignorar") or []
     if not isinstance(ignorar, list):
         raise ConfigError("ignorar deve ser uma lista")
-    return Config(disciplina, norm_tipos, [_norm(p, "ignorar") for p in ignorar])
+    fontes = data.get("fontes") or []
+    if not isinstance(fontes, list):
+        raise ConfigError("fontes deve ser uma lista")
+    norm_fontes = []
+    for p in fontes:
+        rel = _norm(p, "fontes")
+        if rel.rstrip("/") == ".":
+            raise ConfigError("fontes: para ler o workspace inteiro, apague a chave fontes")
+        target = Path(workspace) / rel.rstrip("/")
+        if not target.exists():
+            raise ConfigError(f"fontes: {p!r} não existe no workspace")
+        if target.is_dir() and not rel.endswith("/"):
+            rel += "/"
+        elif not target.is_dir() and rel.endswith("/"):
+            raise ConfigError(f"fontes: {p!r} termina em '/' mas é um arquivo")
+        if rel not in norm_fontes:
+            norm_fontes.append(rel)
+    return Config(disciplina, norm_tipos, [_norm(p, "ignorar") for p in ignorar], sorted(norm_fontes))
