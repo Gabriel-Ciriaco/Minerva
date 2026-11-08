@@ -106,6 +106,59 @@ def test_config_change_triggers_full_reindex(workspace):
     assert acts["doc1_ementa.pdf"] == "alterado"
 
 
+def _fontes_layout(workspace):
+    (workspace / "materiais" / "sub").mkdir(parents=True)
+    (workspace / "materiais" / "aula.md").write_text("## A\ncapivara\n", encoding="utf-8")
+    (workspace / "materiais" / "sub" / "rascunho.md").write_text("## R\ntamandua\n", encoding="utf-8")
+    (workspace / "exercicios").mkdir()
+    (workspace / "exercicios" / "lista.md").write_text("## L\nsolucao minha\n", encoding="utf-8")
+
+
+def test_fontes_limits_scan_to_listed_paths(workspace):
+    _fontes_layout(workspace)
+    (workspace / "minerva.yaml").write_text(
+        "fontes: [materiais, doc1_ementa.pdf]\nignorar: [materiais/sub/]\n", encoding="utf-8")
+    acts = _actions(index.ingest(workspace))
+    assert acts["materiais/aula.md"] == "novo"
+    assert acts["doc1_ementa.pdf"] == "alterado"           # assinatura mudou: reextraído
+    assert acts["doc4_resumo_codigo.md"] == "removido"     # fora das fontes
+    assert "exercicios/lista.md" not in acts               # nunca entrou
+    assert "materiais/sub/rascunho.md" not in acts         # ignorar vale dentro das fontes
+    con = index.connect_ro(workspace)
+    assert index.pending_changes(con, workspace) == []
+    con.close()
+
+
+def test_removing_fontes_brings_workspace_back(workspace):
+    _fontes_layout(workspace)
+    (workspace / "minerva.yaml").write_text("fontes: [materiais/]\n", encoding="utf-8")
+    index.ingest(workspace)
+    (workspace / "minerva.yaml").write_text("", encoding="utf-8")
+    acts = _actions(index.ingest(workspace))
+    assert acts["exercicios/lista.md"] == "novo" and acts["doc4_resumo_codigo.md"] == "novo"
+
+
+def test_unsupported_files_are_not_sources(workspace):
+    (workspace / "script.py").write_text("print(1)\n", encoding="utf-8")
+    (workspace / "LICENSE").write_text("MIT\n", encoding="utf-8")
+    (workspace / "foto.jpg").write_bytes(b"\xff\xd8")
+    rows = index.ingest(workspace)
+    motivos = {r["file"]: r.get("motivo") for r in rows}
+    assert motivos["script.py"] == motivos["LICENSE"] == "formato não suportado"
+    assert _actions(rows)["foto.jpg"] == "novo"  # imagem continua listada (imagem_sem_ocr)
+    con = index.connect_ro(workspace)
+    paths = {p for (p,) in con.execute("SELECT path FROM sources")}
+    assert "script.py" not in paths and "foto.jpg" in paths
+    assert index.pending_changes(con, workspace) == []
+    con.close()
+
+
+def test_unsupported_summary_is_one_line():
+    from minerva.cli import _unsupported_summary
+    line = _unsupported_summary(["a.py", "b/c.py", "LICENSE", "x.css"])
+    assert line.startswith("4 arquivo(s)") and ".py ×2" in line and "\n" not in line
+
+
 def test_schema_mismatch_requires_rebuild(workspace):
     import sqlite3
     db = sqlite3.connect(index.db_path(workspace))
@@ -129,6 +182,7 @@ def test_agent_files_and_hidden_dirs_are_not_sources(workspace):
     (workspace / ".agents" / "notas.md").write_text("## x\nsegredo\n", encoding="utf-8")
     (workspace / "AGENTS.md").write_text("## x\nsegredo\n", encoding="utf-8")
     (workspace / "memory.md").write_text("## x\nsegredo\n", encoding="utf-8")
+    (workspace / "MEMORIA.md").write_text("## x\nsegredo\n", encoding="utf-8")
     index.ingest(workspace)
     con = index.connect_ro(workspace)
     assert not loads(engine.search(con, "segredo")[0])["r"]

@@ -317,6 +317,11 @@ class QuestionBudget:
         self.pages, self.searched = {}, set()
         self.calls, self.listed = 0, False
 
+    def new_question(self):
+        """Início explícito de pergunta (o `minerva chat` sabe quando o aluno pergunta)."""
+        self._reset()
+        self.last = None
+
     def tick(self):
         """Uma chamada de ferramenta; devolve o aviso de excesso, se houver."""
         now = self.clock()

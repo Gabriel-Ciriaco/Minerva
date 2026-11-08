@@ -26,7 +26,8 @@ logging.getLogger("pypdf").addHandler(
 IMAGE_EXT = {".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tif", ".tiff", ".webp"}
 
 # Arquivos do agente/cliente que podem estar na pasta do workspace, mas não são fontes.
-EXCLUDED_NAMES = {"agents.md", "gemini.md", "claude.md", "mcp_config.json", "memory.md", "minerva.yaml"}
+EXCLUDED_NAMES = {"agents.md", "gemini.md", "claude.md", "mcp_config.json", "memory.md", "memoria.md",
+                  "minerva.yaml"}
 
 
 def is_candidate(rel_parts, name):
@@ -181,6 +182,12 @@ def extract_md(path, name):
 
 
 EXTRACTORS = {".pdf": extract_pdf, ".pptx": extract_pptx, ".md": extract_md}
+
+
+def is_supported(name):
+    """Formato que vira fonte. Imagens entram (status `imagem_sem_ocr`) para o aluno saber delas."""
+    ext = "." + name.rsplit(".", 1)[-1].lower() if "." in name else ""
+    return ext in EXTRACTORS or ext in IMAGE_EXT
 
 
 def _status(units):

@@ -8,13 +8,18 @@ import yaml
 
 CONFIG_NAME = "minerva.yaml"
 DOC_TYPES = {"material", "livro"}
-KEYS = {"disciplina", "tipos", "ignorar"}
+KEYS = {"disciplina", "fontes", "tipos", "ignorar", "ollama"}
+OLLAMA_KEYS = {"modelo", "host", "contexto"}
 
 TEMPLATE = """\
 # Configuração do Minerva. Tudo é opcional; apague o que não usar.
 
 # Nome da disciplina (aparece nas respostas do outline).
 # disciplina: Cálculo I
+
+# Pastas ou arquivos que entram no índice. Sem esta chave, todo o workspace é lido.
+# Recomendado: aponte só para os materiais (exercícios e anotações suas ficam de fora).
+# fontes: [materiais/]
 
 # Tipo de cada fonte: "material" (slides, resumos; prioridade na busca) ou "livro".
 # Padrão: documentos com 200 páginas ou mais são livros. Precedência: arquivo >
@@ -25,6 +30,11 @@ TEMPLATE = """\
 
 # Arquivos ou pastas fora do índice.
 # ignorar: [rascunhos/]
+
+# Modelo local para `minerva chat` (Ollama). Precisa suportar ferramentas (ex.: qwen3).
+# host padrão: OLLAMA_HOST ou http://localhost:11434; contexto padrão: 8192 tokens.
+# ollama:
+#   modelo: qwen3:8b
 """
 
 
@@ -37,10 +47,13 @@ class Config:
     disciplina: str = ""
     tipos: dict = field(default_factory=dict)
     ignorar: list = field(default_factory=list)
+    fontes: list = field(default_factory=list)
+    ollama: dict = field(default_factory=dict)  # só o `minerva chat` usa; fora da assinatura
 
     def signature(self):
         """Muda quando a configuração muda o conteúdo do índice."""
-        data = json.dumps({"tipos": self.tipos, "ignorar": self.ignorar}, sort_keys=True)
+        data = json.dumps({"tipos": self.tipos, "ignorar": self.ignorar, "fontes": self.fontes},
+                          sort_keys=True)
         return hashlib.sha256(data.encode()).hexdigest()[:12]
 
     def doc_type(self, rel):
@@ -95,4 +108,34 @@ def load(workspace):
     ignorar = data.get("ignorar") or []
     if not isinstance(ignorar, list):
         raise ConfigError("ignorar deve ser uma lista")
-    return Config(disciplina, norm_tipos, [_norm(p, "ignorar") for p in ignorar])
+    fontes = data.get("fontes") or []
+    if not isinstance(fontes, list):
+        raise ConfigError("fontes deve ser uma lista")
+    norm_fontes = []
+    for p in fontes:
+        rel = _norm(p, "fontes")
+        if rel.rstrip("/") == ".":
+            raise ConfigError("fontes: para ler o workspace inteiro, apague a chave fontes")
+        target = Path(workspace) / rel.rstrip("/")
+        if not target.exists():
+            raise ConfigError(f"fontes: {p!r} não existe no workspace")
+        if target.is_dir() and not rel.endswith("/"):
+            rel += "/"
+        elif not target.is_dir() and rel.endswith("/"):
+            raise ConfigError(f"fontes: {p!r} termina em '/' mas é um arquivo")
+        if rel not in norm_fontes:
+            norm_fontes.append(rel)
+    ollama = data.get("ollama") or {}
+    if not isinstance(ollama, dict):
+        raise ConfigError("ollama deve ser um mapa (modelo, host, contexto)")
+    if set(ollama) - OLLAMA_KEYS:
+        raise ConfigError(f"ollama: chave desconhecida {sorted(set(ollama) - OLLAMA_KEYS)}; "
+                          f"válidas: {sorted(OLLAMA_KEYS)}")
+    for key in ("modelo", "host"):
+        if key in ollama and not (isinstance(ollama[key], str) and ollama[key].strip()):
+            raise ConfigError(f"ollama.{key} deve ser texto")
+    ctx = ollama.get("contexto")
+    if ctx is not None and (not isinstance(ctx, int) or isinstance(ctx, bool) or ctx < 2048):
+        raise ConfigError("ollama.contexto deve ser um número inteiro de tokens (mínimo 2048)")
+    return Config(disciplina, norm_tipos, [_norm(p, "ignorar") for p in ignorar], sorted(norm_fontes),
+                  dict(ollama))
